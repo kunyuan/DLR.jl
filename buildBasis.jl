@@ -1,5 +1,8 @@
-using QuantumStatistics
 using Printf
+include("src/dlr.jl")
+include("src/spectral.jl")
+using .Spectral
+using .DLR
 
 # rtol = [-4, -6, -8, -10, -12]
 # Λ = [100, 1000, 10000, 100000, 1000000]

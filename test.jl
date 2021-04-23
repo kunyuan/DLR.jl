@@ -1,4 +1,8 @@
-using QuantumStatistics, Test, StaticArrays, LinearAlgebra, Printf, Random, Statistics
+include("src/dlr.jl")
+include("src/spectral.jl")
+using .Spectral
+using .DLR
+using Test, StaticArrays, LinearAlgebra, Printf
 using FastGaussQuadrature
 
 function SemiCircle(type, Grid, β, Euv; IsMatFreq=false)
