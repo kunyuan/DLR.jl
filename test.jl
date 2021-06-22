@@ -174,9 +174,9 @@ end
         @test rtol(Gnsample[2, :], Gnfourier[2, :]) .< 500eps # dlr should represent the Green's function up to accuracy of the order eps
 
         Gfourier = DLR.matfreq2tau(type, Gndlr, dlr, τSample, axis=2, rtol=eps)
-        # for (ti, t) in enumerate(τSample)
-        #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", t / β, Gsample[2, ti],  real(Gfourier[2, ti]), abs(Gsample[2, ti] - Gfourier[2, ti]))
-        # end
+        for (ti, t) in enumerate(τSample)
+            @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", t / β, Gsample[2, ti],  real(Gfourier[2, ti]), abs(Gsample[2, ti] - Gfourier[2, ti]))
+        end
 
         println("SemiCircle test case fourier iω to τ rtol=", rtol(Gsample[1, :], Gfourier[1, :]))
         println("Multipole test case fourier  iω to τ rtol=", rtol(Gsample[1, :], Gfourier[1, :]))

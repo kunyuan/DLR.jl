@@ -4,15 +4,15 @@ include("src/spectral.jl")
 using .Spectral
 using .DLR
 
-# rtol = [-4, -6, -8, -10, -12]
-# Λ = [100, 1000, 10000, 100000, 1000000]
-rtol = [-12]
-Λ = [1000]
+rtol = [-4, -6, -8, -10, -12]
+Λ = [100, 1000, 10000, 100000, 1000000]
+# rtol = [-12]
+# Λ = [1000]
 
 for lambda in Λ
     for err in rtol
-        # dlr = DLR.dlr(:fermi, lambda, 10.0^err)
-        dlr = DLR.dlr(:corr, lambda, 10.0^err)
+        dlr = DLR.dlr(:fermi, lambda, 10.0^err)
+        # dlr = DLR.dlr(:corr, lambda, 10.0^err)
         filename = "dlr$(lambda)_1e$err.dlr"
         open(filename, "w") do io
             for r in 1:length(dlr[:ω])
