@@ -48,6 +48,11 @@ function Norm(freq, Q, ω::Float)
     norm = sqrt(norm2)
 end
 
+# function NormExpr(freq, Q)
+#     coeff = [1.0, ]
+
+# end
+
 function orthognalize(freq, Q, ω::Float)
     idx = length(Q) + 1
     qnew = zeros(Float, rank)
