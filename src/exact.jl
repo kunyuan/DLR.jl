@@ -7,8 +7,8 @@ const Float = BigFloat
 const Vec = Vector{Tuple{Float,Float}}
 const rank = 16
 const atol = 1.0e-10
-const Λ0 = Float(1)
-const Λ = Float(100)
+# const Λ0 = Float(1)
+# const Λ = Float(100)
 
 # """
 # \int_1^∞ e^{-ω_1 τ}*e^{-ω_2*τ} dτ = 1/(ω_1+ω_2)
@@ -44,7 +44,7 @@ function Norm(freq, Q, ω::Float)
     for (qi, q) in enumerate(Q)
         norm2 -= (proj(freq, q, ω))^2
     end
-    @assert norm2 > 0
+    @assert norm2 > 0 "$norm2 <=0"
     norm = sqrt(norm2)
 end
 
@@ -131,9 +131,10 @@ function addFreq!(freq, Q, ω)
         # println("Q[i] length = $(length(Q[qi]))")
     end
     Q[idx][idx] = q00
+    return idx
 end
 
-function findFreqMax(freq, Q, idx)
+function findFreqMax(freq, Q, idx, Λ)
     if idx == length(freq)
         ω = find_zero(x -> DNorm2(freq, Q, x), (freq[end] * (1 + 1e-10), freq[end] * 100), Bisection())
         return ω >= Λ ? Λ : ω
@@ -144,38 +145,47 @@ function findFreqMax(freq, Q, idx)
     end
 end
 
-function scheme1(eps)
-    freq = Vector{Float}([Λ0, ])
-    Q = [zeros(Float, length(freq)), ]
-    Q[1][1] = 1.0 / Norm(freq[1])
+function scheme1(eps, Λ)
+    freq = Vector{Float}([1, ])
+    Q = [[1 / Norm(freq[1]), ], ]
     residual = 1.0
+    candidates = [findFreqMax(freq, Q, 1, Λ), ]
     while residual > eps
         maxR = Float(0)
         idx = 1
+        ifreq = 1
         newω = 1
         for i in 1:length(freq)
-            # println("working on $i for $freq")
-            ω = findFreqMax(freq, Q, i)
+            # ω = findFreqMax(freq, Q, i)
+            ω = candidates[i]
             normw = Norm(freq, Q, ω)
             if normw > maxR
                 maxR = normw
-                idx = i
+                # idx = k + 1
+                ifreq = i
                 newω = ω 
             end
         end
         residual = maxR
-        println("$residual residual for ω=$newω")
         if residual > eps
+            idx = addFreq!(freq, Q, newω)
+            # println("add $(length(freq))")
             if idx < length(freq)
-                println("$(length(freq) + 1) basis: ω=$newω between ($(freq[idx]), $(freq[idx + 1]))")
+                println("$(length(freq)) basis: ω=$(Float64(newω)) between ($(Float64(freq[idx - 1])), $(Float64(freq[idx + 1])))")
             else
-                println("$(length(freq) + 1) basis: ω=$newω for the last freq $(freq[idx])")
+                println("$(length(freq)) basis: ω=$(Float64(newω)) for the last freq $(Float64(freq[idx - 1]))")
             end
-            addFreq!(freq, Q, newω)
+            # @assert newidx == idx "idx: $idx != newidx: $newidx"
             # testOrthgonal(freq, Q)
+
+            deleteat!(candidates, ifreq)
+            @assert idx > 1 "idx=$idx"
+            push!(candidates, findFreqMax(freq, Q, idx - 1, Λ))
+            push!(candidates, findFreqMax(freq, Q, idx, Λ))
         end
     end
     testOrthgonal(freq, Q)
+    println("residual=$residual")
 return freq, Q
 end
 
