@@ -1,11 +1,14 @@
 using LinearAlgebra
+using Roots
 # using Gaston
 
-const Float = Float64
+# const Float = Float64
+const Float = BigFloat
 const Vec = Vector{Tuple{Float,Float}}
 const rank = 16
 const atol = 1.0e-10
-const Λ = Float(1000)
+const Λ0 = Float(1)
+const Λ = Float(100)
 
 # """
 # \int_1^∞ e^{-ω_1 τ}*e^{-ω_2*τ} dτ = 1/(ω_1+ω_2)
@@ -17,11 +20,7 @@ end
 function proj(freq, q, ω::Float)
     sum = Float(0)
     for (idx, ωi) in enumerate(freq)
-        # println("idx: $idx, ωi: $ωi")
-        if ωi >= 1 - eps(Float(0))
-            sum += q[idx] * proj(ωi, ω)
-            # println("more: $idx, ", q[idx], ", ", ωi, ", ", proj(ωi, ω))
-        end
+        sum += q[idx] * proj(ωi, ω)
     end
     return sum
 end
@@ -31,10 +30,7 @@ function proj(freq, q1::Vector{Float}, q2::Vector{Float})
     # println(q2)
     sum = Float(0.0)
     for (idx, ωi) in enumerate(freq)
-        if ωi >= 1 - eps(Float(0))
-            sum += q2[idx] * proj(freq, q1, freq[idx])
-            # println(q2[idx], ", ", freq[idx], ", ", proj(freq, q1, freq[idx]))
-        end
+        sum += q2[idx] * proj(freq, q1, freq[idx])
     end
     return sum
 end
@@ -93,10 +89,8 @@ end
 
 function orthognalize(freq, Q, ω::Float)
     idx = length(Q) + 1
-    qnew = zeros(Float, rank)
-    # println(idx)
-    qnew[idx] = 1.0
-    # println(qnew)
+    qnew = zeros(Float, length(freq))
+    # println("compare ", length(freq), " vs ", length(Q[1]))
     for (qi, q) in enumerate(Q)
         qnew .-= proj(freq, q, ω) .* q
     end
@@ -104,7 +98,7 @@ function orthognalize(freq, Q, ω::Float)
     norm = Norm(freq, Q, ω)
     qnew /= norm
 
-    return qnew
+    return qnew, 1 / norm
 end
 
 function testOrthgonal(freq, Q)
@@ -121,6 +115,69 @@ function testOrthgonal(freq, Q)
     @assert maxerr < atol
 end
 
+function addFreq!(freq, Q, ω)
+    idx = findall(x -> x > ω, freq)
+    if length(idx) == 0
+        idx = length(freq) + 1
+    else
+        idx = idx[1]
+    end
+    q, q00 = orthognalize(freq, Q, ω)
+    insert!(freq, idx, ω)
+    insert!(Q, idx, q)
+    # println("freq length = $(length(freq))")
+    for qi in 1:length(Q)
+        insert!(Q[qi], idx, Float(0))
+        # println("Q[i] length = $(length(Q[qi]))")
+    end
+    Q[idx][idx] = q00
+end
+
+function findFreqMax(freq, Q, idx)
+    if idx == length(freq)
+        ω = find_zero(x -> DNorm2(freq, Q, x), (freq[end] * (1 + 1e-10), freq[end] * 100), Bisection())
+        return ω >= Λ ? Λ : ω
+    else
+        # println("DNorm2: ", DNorm2(freq, Q, freq[idx] * (1 + 1e-2)), " -> ", DNorm2(freq, Q, freq[idx + 1] * (1 - 1e-2)))
+        ω = find_zero(x -> DNorm2(freq, Q, x), (freq[idx] * (1 + 1e-6), freq[idx + 1] * (1 - 1e-6)), Bisection())
+        return ω
+    end
+end
+
+function scheme1(eps)
+    freq = Vector{Float}([Λ0, ])
+    Q = [zeros(Float, length(freq)), ]
+    Q[1][1] = 1.0 / Norm(freq[1])
+    residual = 1.0
+    while residual > eps
+        maxR = Float(0)
+        idx = 1
+        newω = 1
+        for i in 1:length(freq)
+            # println("working on $i for $freq")
+            ω = findFreqMax(freq, Q, i)
+            normw = Norm(freq, Q, ω)
+            if normw > maxR
+                maxR = normw
+                idx = i
+                newω = ω 
+            end
+        end
+        residual = maxR
+        println("$residual residual for ω=$newω")
+        if residual > eps
+            if idx < length(freq)
+                println("$(length(freq) + 1) basis: ω=$newω between ($(freq[idx]), $(freq[idx + 1]))")
+            else
+                println("$(length(freq) + 1) basis: ω=$newω for the last freq $(freq[idx])")
+            end
+            addFreq!(freq, Q, newω)
+            # testOrthgonal(freq, Q)
+        end
+    end
+    testOrthgonal(freq, Q)
+return freq, Q
+end
 
 if abspath(PROGRAM_FILE) == @__FILE__    
     freq = zeros(Float, rank)
