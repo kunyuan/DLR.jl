@@ -1,11 +1,12 @@
 using LinearAlgebra
 using Roots
+using Quadmath
 # using Gaston
 
 # const Float = Float64
 const Float = BigFloat
+# const Float = Float128
 const Vec = Vector{Tuple{Float,Float}}
-const rank = 16
 const atol = 1.0e-10
 # const Λ0 = Float(1)
 # const Λ = Float(100)
@@ -41,11 +42,17 @@ function Norm(freq, Q, ω::Float)
 #   qi=sum_j c_ij e^{-ω_j*τ}
 #   norm2 = 1/2ω- \sum_i c_ij*c_ik/(ω+ω_j)/(ω+ω_k)
     norm2 = proj(ω, ω)
+    # if ω > 999.0
+    #     println(norm2)
+    # end
     for (qi, q) in enumerate(Q)
         norm2 -= (proj(freq, q, ω))^2
+        # if ω > 999.0
+        #     println(norm2, " from ", proj(freq, q, ω))
+        # end
     end
-    @assert norm2 > 0 "$norm2 <=0"
-    norm = sqrt(norm2)
+    # @assert norm2 > 0 "$norm2 <=0"
+    norm = sqrt(abs(norm2))
 end
 
 """
@@ -136,12 +143,26 @@ end
 
 function findFreqMax(freq, Q, idx, Λ)
     if idx == length(freq)
-        ω = find_zero(x -> DNorm2(freq, Q, x), (freq[end] * (1 + 1e-10), freq[end] * 100), Bisection())
+        ω = find_zero(x -> DNorm2(freq, Q, x), (freq[end] * (1 + 1e-10), freq[end] * 100), Bisection(), rtol=1e-5)
         return ω >= Λ ? Λ : ω
     else
-        # println("DNorm2: ", DNorm2(freq, Q, freq[idx] * (1 + 1e-2)), " -> ", DNorm2(freq, Q, freq[idx + 1] * (1 - 1e-2)))
-        ω = find_zero(x -> DNorm2(freq, Q, x), (freq[idx] * (1 + 1e-6), freq[idx + 1] * (1 - 1e-6)), Bisection())
+        # println("DNorm2: ", DNorm2(freq, Q, freq[idx] * (2 + 1e-1)), " -> ", DNorm2(freq, Q, freq[idx + 1] * (0.5 - 1e-1)))
+        d1, d2 = freq[idx] * (1 + 1e-5), freq[idx + 1] * (1 - 1e-5)
+        if sign(DNorm2(freq, Q, d1)) == sign(DNorm2(freq, Q, d2))
+            println("warning: $(freq[idx]) -> $(freq[idx + 1]) derivatives have the same sign $(DNorm2(freq, Q, d1)) -> $(DNorm2(freq, Q, d1)) !")
+            ω = sqrt(freq[idx] * freq[idx + 1])
+        else
+            ω = find_zero(x -> DNorm2(freq, Q, x), (d1, d2), Bisection(), rtol=1e-5)
+        end
         return ω
+    end
+end
+
+function findFreqMedian(freq, Q, idx, Λ)
+    if idx == length(freq)
+        return sqrt(freq[idx] * Λ)
+    else
+        return sqrt(freq[idx] * freq[idx + 1])
     end
 end
 
@@ -152,9 +173,7 @@ function scheme1(eps, Λ)
     candidates = [findFreqMax(freq, Q, 1, Λ), ]
     while residual > eps
         maxR = Float(0)
-        idx = 1
-        ifreq = 1
-        newω = 1
+        idx, ifreq, newω = 1, 1, 1
         for i in 1:length(freq)
             # ω = findFreqMax(freq, Q, i)
             ω = candidates[i]
@@ -175,6 +194,7 @@ function scheme1(eps, Λ)
             else
                 println("$(length(freq)) basis: ω=$(Float64(newω)) for the last freq $(Float64(freq[idx - 1]))")
             end
+            # println("residual=$residual")
             # @assert newidx == idx "idx: $idx != newidx: $newidx"
             # testOrthgonal(freq, Q)
 
