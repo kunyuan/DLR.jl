@@ -1,4 +1,5 @@
 using LinearAlgebra
+# using Gaston
 
 const Float = Float64
 const Vec = Vector{Tuple{Float,Float}}
@@ -76,6 +77,20 @@ end
 
 # end
 
+function projectedKernel(freq, Q, ω::Float)
+    # K(τ, ω) ≈ \sum_i <e^{-ωτ}, qi> qi = \sum_k (\sum_ij c_ij*c_ik/(ω+ω_j) e^{-ω_k*τ})
+    amp = zeros(Float, length(Q))
+    for k in 1:length(Q)
+        amp[k] = Float(0)
+        for i in 1:length(Q)
+            for j in 1:length(Q)
+                amp[k] += Q[i][j] * Q[i][k] / (ω + freq[j])
+            end
+    end
+end
+    return amp
+end
+
 function orthognalize(freq, Q, ω::Float)
     idx = length(Q) + 1
     qnew = zeros(Float, rank)
@@ -115,15 +130,20 @@ if abspath(PROGRAM_FILE) == @__FILE__
     println(Q[1])
     println(Norm(freq, Q, 2.0))
 
-    # println("Derivative: ", DNorm2(freq, Q, 1.0))
-    # println("Derivative: ", DNorm2(freq, Q, 2.0))
-    # println("Derivative: ", DNorm2(freq, Q, 10.0))
-    # println("Derivative: ", DNorm2(freq, Q, 100.0))
+    println("Derivative: ", DNorm2(freq, Q, 1.0))
+    println("Derivative: ", DNorm2(freq, Q, 2.0))
+    println("Derivative: ", DNorm2(freq, Q, 10.0))
+    println("Derivative: ", DNorm2(freq, Q, 100.0))
 
     freq[2] = 2.0
     push!(Q, orthognalize(freq, Q, 2.0))
     testOrthgonal(freq, Q)
 
+    # ω = LinRange(0.0, 20.0, 100)
+    # y = [Norm(freq, Q, w) for w in ω]
+    # p = plot(ω, y)
+    # display(p)
+    # readline()
     # println("Derivative: ", DNorm2(freq, Q, 2.0))
     # println("Derivative: ", DNorm2(freq, Q, 10.0))
 
