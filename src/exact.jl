@@ -1,4 +1,4 @@
-using LinearAlgebra
+using LinearAlgebra, Printf
 using Roots
 using Quadmath
 # using Gaston
@@ -50,6 +50,9 @@ function Norm(freq, Q, ω::Float)
         # if ω > 999.0
         #     println(norm2, " from ", proj(freq, q, ω))
         # end
+    end
+    if norm2 < 0.0
+        println("warning: negative norm2 = $norm2 \n freq=$freq \n Q=$Q")
     end
     # @assert norm2 > 0 "$norm2 <=0"
     norm = sqrt(abs(norm2))
@@ -122,6 +125,30 @@ function testOrthgonal(freq, Q)
     @assert maxerr < atol
 end
 
+function residualF(freq, Q, Λ)
+#   qi=sum_j c_ij e^{-ω_j*τ}
+#   int_1^\Lambda dω 1/2ω- \sum_i c_ij*c_ik/(ω+ω_j)/(ω+ω_k)
+#    ln(ω)/2- int_1^\Lambda dω \sum_i c_ij*c_ik/(ω+ω_j)/(ω+ω_k)
+    F0 = log(Λ) / 2
+    F = F0
+    # println("omega:", ω, ", ", proj(ω, ω))
+    for j in 1:length(Q)
+        for k in 1:length(Q)
+            amp = Float(0)
+            for i in 1:length(Q)
+                amp += Q[i][j] * Q[i][k]
+            end
+            if j == k
+                F -= amp * (1 / (freq[j] + 1) - 1 / (freq[j] + Λ))  
+            else
+                F -= amp / (freq[k] - freq[j]) * log((freq[j] + Λ) * (freq[k] + 1) / (freq[j] + 1) / (freq[k] + Λ))
+            end
+        end
+    end
+    return sqrt(F / F0)
+end
+
+
 function addFreq!(freq, Q, ω)
     idx = findall(x -> x > ω, freq)
     if length(idx) == 0
@@ -147,12 +174,12 @@ function findFreqMax(freq, Q, idx, Λ)
         return ω >= Λ ? Λ : ω
     else
         # println("DNorm2: ", DNorm2(freq, Q, freq[idx] * (2 + 1e-1)), " -> ", DNorm2(freq, Q, freq[idx + 1] * (0.5 - 1e-1)))
-        d1, d2 = freq[idx] * (1 + 1e-5), freq[idx + 1] * (1 - 1e-5)
+        d1, d2 = freq[idx] * (1 + 1e-5), freq[idx + 1] * (1 - 1e-6)
         if sign(DNorm2(freq, Q, d1)) == sign(DNorm2(freq, Q, d2))
             println("warning: $(freq[idx]) -> $(freq[idx + 1]) derivatives have the same sign $(DNorm2(freq, Q, d1)) -> $(DNorm2(freq, Q, d1)) !")
             ω = sqrt(freq[idx] * freq[idx + 1])
         else
-            ω = find_zero(x -> DNorm2(freq, Q, x), (d1, d2), Bisection(), rtol=1e-5)
+            ω = find_zero(x -> DNorm2(freq, Q, x), (d1, d2), Bisection(), rtol=1e-6)
         end
         return ω
     end
@@ -186,13 +213,16 @@ function scheme1(eps, Λ)
             end
         end
         residual = maxR
+        # residual = 
         if residual > eps
             idx = addFreq!(freq, Q, newω)
             # println("add $(length(freq))")
             if idx < length(freq)
-                println("$(length(freq)) basis: ω=$(Float64(newω)) between ($(Float64(freq[idx - 1])), $(Float64(freq[idx + 1])))")
+                @printf("%3i : ω=%16.8f ∈ (%16.8f, %16.8f)\n", length(freq), newω, freq[idx - 1], freq[idx + 1])
+                # println("$(length(freq)) basis: ω=$(Float64(newω)) between ($(Float64(freq[idx - 1])), $(Float64(freq[idx + 1])))")
             else
-                println("$(length(freq)) basis: ω=$(Float64(newω)) for the last freq $(Float64(freq[idx - 1]))")
+                @printf("%3i : ω=%16.8f ∈ (%16.8f, Λ)\n", length(freq), newω, freq[idx - 1])
+                # println("$(length(freq)) basis: ω=$(Float64(newω)) for the last freq $(Float64(freq[idx - 1]))")
             end
             # println("residual=$residual")
             # @assert newidx == idx "idx: $idx != newidx: $newidx"
@@ -205,7 +235,7 @@ function scheme1(eps, Λ)
         end
     end
     testOrthgonal(freq, Q)
-    println("residual=$residual")
+    @printf("residual = %.10e, Fnorm/F0 = %.10e\n", residual, residualF(freq, Q, Λ))
 return freq, Q
 end
 

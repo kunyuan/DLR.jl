@@ -23,6 +23,8 @@ Compute the imaginary-time kernel of different type.
         return kernelBoseT(τ, ω, β)
     elseif type == :corr
         return kernelCorrT(τ, ω, β)
+    elseif type == :zero
+        return kernelZeroT(τ, ω)
     else
         @error "Type $type      is not implemented!"
     end
@@ -127,6 +129,23 @@ K(τ) = e^{-ω|τ|}+e^{-ω(β-|τ|)}
     (-β < τ <= β) || error("τ must be (-β, β]")
     τ=abs(τ)
     return exp(-ω*τ)+exp(-ω*(β-τ))
+end
+
+"""
+    kernelZeroT(τ, ω)
+
+Compute the imaginary-time kernel for correlation function ``⟨O(τ)O(0)⟩``. Machine accuracy ~eps(C) is guaranteed``
+```math
+K(τ) = e^{-ωτ}
+```
+
+# Arguments
+- `τ`: the imaginary time, must be (0, ∞)
+- `ω`: frequency
+"""
+@inline function kernelZeroT(τ::T, ω::T) where {T <: AbstractFloat}
+    (τ >= T(0)) || error("τ must be (0, ∞)")
+    return exp(-ω*τ)
 end
 
 
